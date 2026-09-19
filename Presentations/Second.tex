@@ -1,0 +1,430 @@
+% !TEX program = xelatex
+\documentclass[10pt]{beamer}
+\usetheme{Madrid}
+\usepackage{tikz} 
+\usepackage{amsmath,amssymb,amsthm}
+
+% 1. Hide navigation symbols
+\setbeamertemplate{navigation symbols}{}
+
+% 2. Define colors
+\definecolor{MetroDark}{RGB}{26, 60, 115}   
+\definecolor{MetroOrange}{RGB}{235, 129, 27} 
+\definecolor{LightBg}{RGB}{240, 245, 250}
+
+% 3. Apply colors
+\setbeamercolor{palette primary}{bg=MetroDark,fg=white}
+\setbeamercolor{palette secondary}{bg=MetroDark!80,fg=white}
+\setbeamercolor{palette tertiary}{bg=MetroDark!90,fg=white}
+\setbeamercolor{title}{bg=MetroDark,fg=white}
+\setbeamercolor{frametitle}{bg=MetroDark,fg=white}
+\setbeamercolor{itemize item}{fg=MetroOrange}
+\setbeamercolor{itemize subitem}{fg=MetroOrange}
+\setbeamercolor{structure}{fg=MetroDark}
+
+\setbeamercolor{block title}{bg=MetroDark, fg=white}
+\setbeamercolor{block body}{bg=LightBg, fg=black}
+\setbeamercolor{block title alerted}{bg=MetroOrange, fg=white}
+\setbeamercolor{block body alerted}{bg=MetroOrange!10, fg=black}
+
+\setbeamertemplate{theorems}[numbered]
+\setbeamertemplate{bibliography item}[text]
+\newtheorem{proposition}[theorem]{Proposition} 
+
+% --- Title Page ---
+\title[Independent Edge Sampling for Spanners]{Random Edge Sampling \\ for Spanner Construction}
+\subtitle{B.Sc. Thesis in Computer Science}
+\author[M. Ahmadi]{Candidate: Mohammadreza Ahmadi \\ \vspace{0.3cm} Supervisor: Dr. Hossein Jowhari}
+\institute[KNTU]{Faculty of Mathematics \\ K. N. Toosi University of Technology}
+\date{September 2026}
+\setbeamertemplate{footline}[frame number]
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+
+% ==========================================
+\section{Introduction and Preliminaries}
+% ==========================================
+
+\begin{frame}{Core Definitions: Graph Spanners}
+    We consider unweighted, undirected $n$-vertex graphs $G = (V,E)$.
+    
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item \textbf{Multiplicative $\alpha$-Spanner:} A subgraph $H = (V, E')$ preserving shortest paths up to a \textbf{stretch factor} $\alpha \ge 1$:
+        \[ d_H(u,v) \le \alpha \cdot d_G(u,v) \quad \forall u, v \in V \]
+        
+        \vspace{0.6cm}
+        \begin{proposition}
+            $H$ is a $t$-spanner of $G \iff d_H(u, v) \le t$ for all edges $uv \in E$.
+        \end{proposition}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Example: A $2$-Spanner}
+    \begin{center}
+        \begin{tikzpicture}[scale=1.2]
+            \tikzstyle{every node}=[circle, draw=MetroDark, fill=MetroDark, inner sep=0pt, minimum size=4pt]
+            
+            \begin{scope}[xshift=-3.5cm]
+                \node (v1) at (0, 0) {};
+                \node (v2) at (1.5, 0.5) {};
+                \node (v3) at (2.5, 0) {};
+                \node (v4) at (0.5, 1.5) {};
+                \node (v5) at (2, 2) {};
+                \node (v6) at (3, 1.5) {};
+                
+                \draw[gray, thick] (v1) -- (v2) -- (v3) -- (v6) -- (v5) -- (v4) -- (v1);
+                \draw[gray, thick] (v2) -- (v5);
+                \draw[gray, thick] (v2) -- (v4);
+                \draw[gray, thick] (v3) -- (v5);
+                \draw[gray, thick] (v1) -- (v5);
+                \node[draw=none, fill=none] at (1.5, -0.6) {Original Graph $G$};
+            \end{scope}
+
+            \draw[->, very thick, MetroOrange] (-0.3, 1) -- (0.5, 1);
+
+            \begin{scope}[xshift=1.5cm]
+                \node (u1) at (0, 0) {};
+                \node (u2) at (1.5, 0.5) {};
+                \node (u3) at (2.5, 0) {};
+                \node (u4) at (0.5, 1.5) {};
+                \node (u5) at (2, 2) {};
+                \node (u6) at (3, 1.5) {};
+                
+                \draw[MetroDark, thick] (u1) -- (u2) -- (u3);
+                \draw[MetroDark, thick] (u3) -- (u6) -- (u5) -- (u4) -- (u1);
+                \draw[MetroDark, thick] (u2) -- (u5);
+                \node[draw=none, fill=none] at (1.5, -0.6) {A $2$-Spanner $H$};
+            \end{scope}
+        \end{tikzpicture}
+    \end{center}
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \textbf{Intractability:} Finding the optimally sparse $t$-spanner is \textbf{NP-Hard}, forcing us to use approximations.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Theoretical Limits: Girth and Edge Density}
+    \textbf{Girth ($g$):} Length of the shortest cycle in a graph.
+    
+    \vspace{0.2cm}
+    \begin{proposition}
+        A graph with girth $> t + 1$ has \textbf{no proper subgraph} that is a $t$-spanner.
+    \end{proposition}
+    
+    \vspace{0.4cm}
+    \textbf{Maximum Edge Density ($\gamma$):}
+    \begin{itemize}
+        \item $\gamma(n,k)$: Max possible edges in an $n$-vertex graph with girth $> k$.
+        \item \textbf{The Fundamental Barrier:} Because of the proposition above, no algorithm can construct a $t$-spanner sparser than $\gamma(n, t+1)$ in the worst case.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The Asymptotic Baseline: Moore \& Erdős}
+    Exact values for $\gamma(n,k)$ remain a major open problem, but we rely on asymptotic bounds:
+    
+    \vspace{0.4cm}
+    \begin{block}{Moore Bound \& Erdős' Girth Conjecture}
+        For graphs with girth $> 2k$:
+        \begin{itemize}
+            \item \textbf{Upper Bound (Moore):} $O(n^{1+1/k})$ edges.
+            \item \textbf{Lower Bound (Erdős):} $\Omega(n^{1+1/k})$ edges (Conjectured tight).
+        \end{itemize}
+    \end{block}
+    
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item A $(2k-1)$-spanner with $O(n^{1+1/k})$ edges is considered structurally \textbf{optimal}.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The Classical Approach: Greedy Algorithm}
+    \begin{block}{Greedy Spanner (Althöfer et al., 1993)}
+        Process edges sequentially. Add $e=(u,v)$ to $H$ \textbf{only if}:
+        \[ d_H(u,v) > 2k-1 \]
+    \end{block}
+    
+    \vspace{0.6cm}
+    \begin{center}
+        \renewcommand{\arraystretch}{1.5} % فاصله‌گذاری مناسب بین ردیف‌ها
+        \begin{tabular}{p{0.45\textwidth} | p{0.45\textwidth}}
+            \textcolor{MetroDark}{\Large \textbf{Pros}} & \textcolor{MetroOrange}{\Large \textbf{Cons}} \\
+            \hline
+            \textcolor{MetroDark}{$\checkmark$} \textbf{Optimal Sparsity} \newline {\footnotesize Guarantees $O(n^{1+1/k})$ edges.} 
+            & \textcolor{MetroOrange}{$\times$} \textbf{High Time Complexity} \newline {\footnotesize $O(k \cdot n^{2+1/k})$ bottleneck.} \\
+            
+            & \textcolor{MetroOrange}{$\times$} \textbf{Strictly Sequential} \newline {\footnotesize Fails in distributed networks.}
+        \end{tabular}
+    \end{center}
+\end{frame}
+
+% ==========================================
+\section{State of the Art \& Our Motivation}
+% ==========================================
+
+\begin{frame}{State of the Art: Elkin \& Neiman (2019)}
+    \textbf{Goal:} Bypass the Greedy algorithm's sequential bottleneck via a distributed randomized framework.
+    
+    \vspace{0.4cm}
+    \textbf{The Mechanism: \textcolor{MetroOrange}{Vertex-Based Randomness}}
+    \begin{itemize}
+        \item Each vertex $u \in V$ independently samples $r_u \sim \mathcal{EXP}(\ln(cn)/k)$.
+        \item Vertices broadcast these radii to neighbors and select edges based on the maximums received.
+    \end{itemize}
+
+    \vspace{0.4cm}
+    \textbf{Theoretical Achievements:}
+    \begin{itemize}
+        \item Achieves $O((n/\epsilon)^{1+1/k})$ expected edges.
+        \item Computes the spanner in exactly $k$ communication rounds (CONGEST model).
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The Paradigm Shift: Our Motivation}
+    The Elkin-Neiman framework is elegant, but inherently algorithmic:
+    
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item Randomness is exclusively assigned to the \textbf{vertices}.
+        \item It requires message passing, broadcasting, and state comparisons.
+    \end{itemize}
+
+    \vspace{0.8cm}
+    \begin{alertblock}{The Core Question of Our Thesis}
+        Can we eliminate these communication phases entirely? 
+        
+        \vspace{0.3cm}
+        \textit{What if we sample edges \textbf{independently and directly}, relying solely on the local topology of the graph?}
+    \end{alertblock}
+\end{frame}
+
+\begin{frame}{Independent Edge Sampling: Initial Attempts}
+    How do we define the independent sampling probability $p_e$?
+    
+    \vspace{0.4cm}
+    \textbf{Attempt 1: Global Minimum Probability}
+    \begin{itemize}
+        \item Set a uniform, high probability across all edges to ensure path survival.
+        \item \textcolor{MetroOrange}{Result:} The graph remains far too dense (fails the sparsity goal).
+    \end{itemize}
+
+    \vspace{0.6cm}
+    \textbf{Attempt 2: Deterministic Deletion}
+    \begin{itemize}
+        \item Drop an edge $e$ simply because it has an alternative path $P$.
+        \item \textcolor{MetroOrange}{Result:} Edges inside $P$ drop independently (cascading failures). The path collapses, destroying the stretch guarantee.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The Dependency Bottleneck}
+    \textbf{Definition:} Let $x_e$ be the maximum number of edge-disjoint \textbf{good paths} (length $\le t$) alternative to $e$.
+    
+    \vspace{0.1cm}
+    \[
+    p_e = 
+    \begin{cases} 
+        1 & \text{if } x_e \le c \\
+        \frac{c}{x_e} & \text{if } x_e > c
+    \end{cases}
+    \]
+    
+    \vspace{0.3cm}
+    \textbf{Result:}
+    \begin{itemize}
+        \item Path survival requires \textit{every} internal edge to be sampled.
+        \item A single dense edge ($x_{e'} \gg c$) in a good path has $p_{e'} \to 0$.
+        \item This single dropped edge disconnects the path and violates the stretch.
+    \end{itemize}
+\end{frame}
+
+% ==========================================
+\section{The $2c$-Cutoff Framework}
+% ==========================================
+
+\begin{frame}{Our Contribution: The $2c$-Cutoff Filter}
+    \textbf{Core Idea:} Alternative paths must be structurally \textbf{reliable}.
+    
+    \vspace{0.3cm}
+    \begin{block}{Definition: Safe Path}
+        A path $P$ is a \textbf{safe path} for edge $e$ if:
+        \begin{enumerate}
+            \item Edge-disjoint from all other safe paths for $e$.
+            \item Length $\le t = 2k-1$.
+            \item Contains no highly dense edges: $x_{e'} \le 2c \;\; (\forall e' \in P)$.
+        \end{enumerate}
+    \end{block}
+
+    \vspace{0.4cm}
+    To ensure path survival, the cutoff is set to:
+    \[
+\boldsymbol{c = \Theta\!\left(2^t \log n\right)}
+\]
+\end{frame}
+
+\begin{frame}{Expected Sparsity Analysis}
+    \textbf{Goal:} Bound the expected number of edges $\mathbb{E}[|E'|] = \sum p_e$.
+    
+    \vspace{0.4cm}
+    \textbf{1. Critical Edges ($x_e \le c$) $\implies p_e = 1$}
+    \begin{itemize}
+        \item Bounded via Greedy Decomposition and Moore's Bound.
+        \item \textbf{Total size:} $\mathbf{O(c \cdot n^{1+1/k})}$.
+    \end{itemize}
+
+    \vspace{0.6cm}
+    \textbf{2. Dense Edges ($x_e > c$) $\implies p_e = c/x_e$}
+    \begin{itemize}
+        \item Partitioned into $O(\log n)$ exponentially growing buckets.
+        \item Bucket growth rate perfectly cancels the exponential drop in $p_e$.
+        \item \textbf{Total size:} $\mathbf{O(c \cdot n^{1+1/k} \log n)}$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Final Spanner Size \& Performance}
+    Substituting $c = \Theta(2^{2k} \log n)$, the expected number of edges is:
+    \[ \mathbf{O(2^{2k} n^{1+1/k} \log^2 n)} \]
+    
+    \vspace{0.6cm}
+    \textbf{Constant Stretch Regime:}
+    \begin{itemize}
+        \item For small constant $k$, the $2^{2k}$ overhead is a trivial factor.
+        \item The framework naturally produces highly sparse spanners purely through independent sampling.
+    \end{itemize}
+    
+    \vspace{0.4cm}
+    \textbf{Optimal Scaling:}
+    \begin{itemize}
+        \item By optimizing the scale parameter to $k^* = \Theta(\sqrt{\log n})$.
+        \item The total expected size of the spanner becomes near-linear: $\mathbf{n^{1+o(1)}}$.
+    \end{itemize}
+\end{frame}
+
+% ==========================================
+\section{Algorithmic Realization}
+% ==========================================
+
+\begin{frame}{The Algorithmic Challenge}
+    \begin{alertblock}{The NP-Hardness}
+        Computing $x_e$ (the exact maximum number of edge-disjoint safe paths) is \textbf{NP-Hard} for $t \ge 4$ \textcolor{gray}{\small (Itai et al., 1982)}.
+    \end{alertblock}
+    \vspace{1cm}
+    We need an efficiently computable parameter $q_e$ that can safely replace $x_e$ without violating the stretch guarantees.
+\end{frame}
+
+\begin{frame}{The Two-Phase Greedy Algorithm}    
+    \begin{block}{Phase 1: Upper Bound Extraction}
+        \begin{itemize}
+            \item Temporarily \textbf{ignore} the safety condition.
+            \item Run iterative BFS to extract a maximal set of paths. Let this count be $q_e^{(0)}$.
+            \item If $q_e^{(0)} \le 2c$, the edge is definitively labeled \textbf{safe}. Otherwise, it is \textbf{heavy}.
+        \end{itemize}
+    \end{block}
+
+    \vspace{0.3cm}
+    \begin{block}{Phase 2: Safe Path Isolation}
+        \begin{itemize}
+            \item Remove all \textit{heavy} edges from the graph.
+            \item Re-run iterative BFS on this purified subgraph.
+            \item The new count is $q_e$. Every path found is structurally guaranteed to be valid and safe.
+        \end{itemize}
+    \end{block}
+    
+    \vspace{0.2cm}
+    \textbf{Time Complexity:} Iterative BFS takes $O(m)$ per path $\implies \mathbf{O(m^3)}$ overall.
+\end{frame}
+
+\begin{frame}{Algorithmic Realization: Greedy Approximation}
+    \begin{block}{Lemma: Greedy $t$-Approximation}
+        The extracted maximal set size ($q_e$) bounds the optimal maximum set size ($x_e$):
+        \[ \frac{x_e}{t} \le q_e \le x_e \]
+    \end{block}
+    
+    \vspace{0.4cm}
+    \textbf{Proof:}
+    \begin{itemize}
+        \item Let $OPT$ ($|OPT| = x_e$) be the \textit{maximum} possible packing of safe paths.
+        \item Let $GREEDY$ ($|GREEDY| = q_e$) be our extracted \textit{maximal} packing.
+    \end{itemize}
+    
+    \vspace{0.4cm}
+    \textbf{The Upper Bound ($q_e \le x_e$)}
+    \begin{itemize}
+        \item Trivial by definition. Since $x_e$ is the absolute theoretical maximum capacity, no valid packing ($GREEDY$) can physically exceed it.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Proof Continued: The Lower Bound ($x_e \le t \cdot q_e$)}
+    \textbf{The Lower Bound}
+    
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item Since $GREEDY$ is \textit{maximal}, it cannot be extended. Thus, every path in $OPT$ must intersect at least one path in $GREEDY$.
+        
+        \vspace{0.2cm}
+        \item A single path $P \in GREEDY$ has at most $t$ edges.
+        
+        \vspace{0.2cm}
+        \item Because paths in $OPT$ are strictly edge-disjoint, each edge of $P$ can intersect at most \textit{one} path in $OPT$.
+        
+        \vspace{0.2cm}
+        \item Consequently, a single path in $GREEDY$ can block no more than $t$ distinct paths in $OPT$.
+    \end{itemize}
+    
+    \vspace{0.4cm}
+    \begin{block}{Conclusion}
+        Summing the maximum blocked paths across all of $GREEDY$:
+        \[ |OPT| \le t \cdot |GREEDY| \implies \mathbf{x_e \le t \cdot q_e} \hfill \square \]
+    \end{block}
+\end{frame}
+
+\begin{frame}{The Final Algorithmic Spanner Size}
+    Since $q_e \ge x_e/t$, the approximation increases the sampling probability by at most a factor of $t$.
+    
+    \vspace{0.5cm}
+    \textbf{Linearity of Expectation:}
+    \[ 
+    \mathbb{E}[|E'|] = \sum_{e \in E} p'_e \le t \sum_{e \in E} p_e = t \cdot \mathbb{E}[|E_{opt}|] 
+    \]
+    
+    \vspace{0.6cm}
+    \begin{exampleblock}{Polynomial-Time Guarantee}
+        Substituting $t = 2k-1$, the final expected spanner size becomes:
+        \[ \mathbf{O(k \cdot 2^{2k} n^{1+1/k} \log^2 n)} \]
+    \end{exampleblock}
+\end{frame}
+
+% ==========================================
+\section{Conclusion & Future Work}
+% ==========================================
+
+\begin{frame}{Conclusion \& Open Problems}
+    \textbf{Key Contributions:}
+    \begin{itemize}
+        \item Designed a novel framework based purely on independent edge sampling.
+        \item Resolved the dependency bottleneck using the $2c$-cutoff filter.
+        \item Bypassed NP-Hardness via an $O(m^3)$ two-phase greedy approximation.
+        \item Achieved an expected spanner size of $O(k \cdot 2^{2k} n^{1+1/k} \log^2 n)$.
+    \end{itemize}
+
+    \vspace{0.6cm}
+    \textbf{Future Directions:}
+    \begin{itemize}
+        \item Is the $O(2^{2k})$ overhead fundamental to independent sampling, or merely an artifact of our analysis?
+        \item Can the $O(m^3)$ time complexity or the $t$-approximation ratio be further improved?
+        \item Are there entirely different local topological metrics that avoid path-counting ($x_e$) altogether?
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \vspace{1cm}
+    \begin{center}
+        \Huge \textbf{Thank You!} \\
+    \end{center}
+\end{frame}
+
+\end{document}

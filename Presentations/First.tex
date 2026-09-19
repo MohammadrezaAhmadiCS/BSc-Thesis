@@ -1,0 +1,787 @@
+% !TEX program = xelatex
+\documentclass{beamer}
+\usetheme{Madrid}
+\usepackage{tikz} 
+
+% 1. Hide navigation symbols
+\setbeamertemplate{navigation symbols}{}
+
+% 2. Define colors
+\definecolor{MetroDark}{RGB}{26, 60, 115}   
+\definecolor{MetroOrange}{RGB}{235, 129, 27} 
+\definecolor{LightBg}{RGB}{240, 245, 250}
+
+% 3. Apply colors
+\setbeamercolor{palette primary}{bg=MetroDark,fg=white}
+\setbeamercolor{palette secondary}{bg=MetroDark!80,fg=white}
+\setbeamercolor{palette tertiary}{bg=MetroDark!90,fg=white}
+\setbeamercolor{title}{bg=MetroDark,fg=white}
+\setbeamercolor{frametitle}{bg=MetroDark,fg=white}
+\setbeamercolor{itemize item}{fg=MetroOrange}
+\setbeamercolor{itemize subitem}{fg=MetroOrange}
+\setbeamercolor{structure}{fg=MetroDark}
+
+\setbeamercolor{block title}{bg=MetroDark, fg=white}
+\setbeamercolor{block body}{bg=LightBg, fg=black}
+\setbeamercolor{block title alerted}{bg=MetroOrange, fg=white}
+\setbeamercolor{block body alerted}{bg=MetroOrange!10, fg=black}
+
+\setbeamertemplate{theorems}[numbered]
+\setbeamertemplate{bibliography item}[text]
+\newtheorem{proposition}[theorem]{Proposition} 
+
+% --- Title Page ---
+\title[Sparse Spanners \& Emulators]{Efficient Algorithms for Constructing \\ Very Sparse Spanners and Emulators}
+\subtitle{Paper by: Michael Elkin and Ofer Neiman}
+\author[M. Ahmadi]{Presented by: Mohammadreza Ahmadi \\ \vspace{0.3cm} Supervisor: Dr. Hossein Jowhari}
+\institute[KNTU]{Faculty of Mathematics \\ K. N. Toosi University of Technology}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Outline}
+    \tableofcontents
+\end{frame}
+
+% ==========================================
+\section{Introduction and Preliminaries}
+% ==========================================
+
+\begin{frame}{Core Definitions: Spanners}
+    We consider unweighted, undirected $n$-vertex graphs $G = (V,E)$.
+    
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item \textbf{Multiplicative $\alpha$-Spanner:} A subgraph $H = (V, E')$ is an $\alpha$-spanner of $G$ if for every pair $u, v \in V$:
+        \[ d_H(u,v) \le \alpha \cdot d_G(u,v) \]
+        \textit{(The parameter $\alpha \ge 1$ is called the \textbf{stretch} factor).}
+        
+        \vspace{0.4cm}
+        \item \textbf{General $(\alpha, \beta)$-Spanner:} A subgraph $H = (V, E')$ is an $(\alpha, \beta)$-spanner of $G$ if for every pair $u, v \in V$:
+        \[ d_H(u,v) \le \alpha \cdot d_G(u,v) + \beta \]
+        \textit{(If $\alpha = 1 + \epsilon$ for some small $\epsilon > 0$, it is a \textbf{near-additive} spanner).}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Core Definitions: Emulators \& Skeletons}
+    What if we relax the strict subgraph or stretch requirements?
+    
+    \vspace{0.5cm}
+    \begin{itemize}
+        \item \textbf{Emulator:} A graph $H = (V, E'', \omega)$ approximating distances in $G$. It is \textbf{not restricted to being a subgraph} and may use new weighted edges to "emulate" original paths.
+        
+        \vspace{0.6cm}
+        \item \textbf{Skeleton:} A connected spanning subgraph of $G$ where the \textbf{stretch requirement is dropped}, serving merely as an ultra-sparse backbone for connectivity.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Example: A $3$-Spanner}
+    \begin{center}
+        \begin{tikzpicture}[scale=1.2]
+            \tikzstyle{every node}=[circle, draw=MetroDark, fill=MetroDark, inner sep=0pt, minimum size=4pt]
+            
+            \begin{scope}[xshift=-3.5cm]
+                \node (v1) at (0, 0) {};
+                \node (v2) at (1.5, 0.5) {};
+                \node (v3) at (2.5, 0) {};
+                \node (v4) at (0.5, 1.5) {};
+                \node (v5) at (2, 2) {};
+                \node (v6) at (3, 1.5) {};
+                
+                \draw[gray, thick] (v1) -- (v2) -- (v3) -- (v6) -- (v5) -- (v4) -- (v1);
+                \draw[gray, thick] (v2) -- (v5);
+                \draw[gray, thick] (v2) -- (v4);
+                \draw[gray, thick] (v3) -- (v5);
+                \draw[gray, thick] (v1) -- (v5);
+                \node[draw=none, fill=none] at (1.5, -0.6) {Original Graph $G$};
+            \end{scope}
+
+            \draw[->, very thick, MetroOrange] (-0.3, 1) -- (0.5, 1);
+
+            \begin{scope}[xshift=1.5cm]
+                \node (u1) at (0, 0) {};
+                \node (u2) at (1.5, 0.5) {};
+                \node (u3) at (2.5, 0) {};
+                \node (u4) at (0.5, 1.5) {};
+                \node (u5) at (2, 2) {};
+                \node (u6) at (3, 1.5) {};
+                
+                \draw[MetroDark, thick] (u1) -- (u2) -- (u3);
+                \draw[MetroDark, thick] (u3) -- (u6) -- (u5) -- (u4) -- (u1);
+                \draw[MetroDark, thick] (u2) -- (u5);
+                \node[draw=none, fill=none] at (1.5, -0.6) {A $3$-Spanner $H$};
+            \end{scope}
+        \end{tikzpicture}
+    \end{center}
+    \vspace{0.5cm}
+    \begin{itemize}
+        \item Notice how many edges are removed, yet the shortest path between any two nodes in $H$ is at most $3$ times their distance in $G$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Checking the Stretch Factor}
+    \begin{proposition}
+        $H$ is a $t$-spanner of $G$ if and only if $d_H(u, v) \le t \cdot d_G(u, v)$ for all $uv \in E$.
+    \end{proposition}
+    \begin{proof}
+        The forward direction is obvious. For the reverse direction, let $u$ and $v$ be distinct vertices in $V$, and let $u_0u_1 \dots u_m$ be a shortest $u-v$ path in $G$, where $u_0 = u$ and $u_m = v$. Then note that by assumption,
+        \[ d_H(u, v) \le \sum_{i=0}^{m-1} d_H(u_i, u_{i+1}) \le t \cdot \sum_{i=0}^{m-1} d_G(u_i, u_{i+1}) = t \cdot d_G(u,v). \]
+    \end{proof}
+\end{frame}
+
+\begin{frame}{Computational Complexity}
+    \begin{block}{Hardness of Optimal Spanners}
+        Given an unweighted graph $G$, and integers $t, m' \ge 1$, determining if $G$ has a $t$-spanner containing $m'$ or fewer edges is \textbf{NP-complete}, even when $t$ is fixed to be 2.
+    \end{block}
+    
+    \vspace{0.6cm}
+    \begin{itemize}
+        \item \textbf{Proof Idea:} Based on a reduction from the Edge Dominating Set (EDS) problem on bipartite graphs.
+        \vspace{0.2cm}
+        \item \textbf{Consequence:} Exact optimization is intractable; thus, our focus shifts entirely to \textbf{efficient approximation algorithms}.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Graph Girth and Edge Density}
+    The \textbf{girth} of a graph is the length of its shortest cycle. 
+    
+    \vspace{0.2cm}
+    \textbf{Maximum Edge Density:} Let $\gamma(n,k)$ denote the maximum possible number of edges in an $n$-vertex graph with girth strictly greater than $k$.
+    
+    \vspace{0.3cm}
+    \begin{proposition}
+        An undirected unweighted graph $G = (V,E)$ of girth $> t + 1$ has no proper subgraph that is a $t$-spanner.
+    \end{proposition}
+    
+    \vspace{0.1cm}
+    \textit{Proof.}
+    \begin{itemize}
+        \item For any edge $uv \in E$, we have $d_G(u,v) = 1$.
+        \item If $uv$ is removed, the shortest alternative path length is exactly one less than the length of the shortest cycle containing $uv$.
+        \item Since $G$'s overall girth is $> t + 1$, this new path is strictly $> t$.
+        \item Thus, $d_{G \setminus \{uv\}}(u,v) > t$, and the stretch property is instantly violated. \hfill $\square$
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The Moore Bounds}
+    Determining the exact value of $\gamma(n,k)$ remains a major open problem, but asymptotic upper bounds are given by a folklore counting argument:
+    
+    \vspace{0.4cm}
+    \begin{proposition}[Moore Bounds]
+        \[ \gamma(n,k) = O\left(n^{1 + \frac{1}{\lfloor k/2 \rfloor}}\right) \]
+    \end{proposition}
+    
+    \vspace{0.6cm}
+    \begin{itemize}
+        \item \textbf{Algorithmic Implication:} If an algorithm claims to construct a $t$-spanner with $|E'|$ edges in the general case, it \textbf{cannot} beat the density bound of $\gamma(n, t+1)$. 
+        \item In other words, any bound like $|E'| \le \gamma(n, t+1) - 1$ is theoretically impossible.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Erdős' Girth Conjecture}
+    The Erdős' Girth Conjecture states that the Moore Bounds are absolutely tight:
+    \[ \gamma(n,k) = \Omega\left(n^{1 + \frac{1}{\lfloor k/2 \rfloor}}\right) \]
+    
+    \vspace{0.4cm}
+    \textbf{Crucial Roles in Spanner Literature:}
+    \begin{itemize}
+        \item \textbf{Ultimate Baseline:} It defines the fundamental theoretical limit on how sparse any spanner could possibly be.
+        \vspace{0.2cm}
+        \item \textbf{Proving Optimality:} Many natural algorithmic questions and optimal size/distortion tradeoffs (like $O(n^{1+1/k})$ edges for $2k-1$ stretch) are considered "optimal" \textbf{only if} this conjecture is assumed to be true.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The Traditional Approach: Greedy Algorithm}
+    The simplest and most basic algorithm for computing a multiplicative $\alpha$-spanner ($\alpha \ge 1$) is the \textbf{greedy algorithm}.
+    
+    \vspace{0.4cm}
+    \begin{block}{Greedy Spanner}
+        $E' \gets \emptyset$ \\
+        $H \gets (V, E')$ \\
+        \textbf{for each} edge $e = (u,v) \in E$ \textbf{do} \\
+        \hspace{0.5cm} \textbf{if} $d_H(u,v) > \alpha$ \textbf{then} \\
+        \hspace{1.0cm} $E' \gets E' \cup \{(u,v)\}$ \\
+        \hspace{1.0cm} Update $H$ \\
+        \textbf{return} $H$
+    \end{block}
+\end{frame}
+
+\begin{frame}{Analysis of the Greedy Algorithm}
+    \textbf{1. Why is the output a valid $\alpha$-spanner?}
+    \begin{itemize}
+        \item For any edge $e=(u,v) \in E$, the algorithm discards it \textbf{only if} $d_H(u,v) \le \alpha$. 
+        \item Thus, all edges in $E$ inherently satisfy the stretch constraint. By the triangle inequality, this guarantees the required stretch for all vertex pairs.
+    \end{itemize}
+    
+    \vspace{0.4cm}
+    \textbf{2. Why does $H$ have no short cycles?}
+    \begin{itemize}
+        \item Suppose $H$ contains a cycle of length $\le \alpha + 1$. 
+        \item Consider the \textbf{last edge} $e=(u,v)$ of this cycle that was evaluated.
+        \item Just before $e$ was considered, the rest of the cycle was already in $H$, forming a path of length $\le \alpha$ between $u$ and $v$.
+        \item The algorithm would have \textbf{discarded} $e$! This contradiction proves $g(H) \ge \alpha + 2$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Properties of the Greedy Spanner: The Payoff}
+    By design, the greedy algorithm ensures that the resulting $\alpha$-spanner $H$ contains \textbf{no cycles of length $\alpha + 1$ or less}.
+    
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item \textbf{Girth Consequence:} The girth of $H$ satisfies $g(H) \ge \alpha + 2$.
+        
+        \vspace{0.3cm}
+        \item \textbf{Theoretical Optimality:} Recall Moore's Bound, which states that a graph with girth $g$ has at most $O\left(n^{1 + \frac{2}{g-2}}\right)$ edges.
+        
+        \vspace{0.3cm}
+        \item \textbf{The Final Edge Count:} Substituting $g(H) \ge \alpha + 2$ into the bound, the maximum number of edges in our spanner $H$ is strictly bounded by:
+        \[ |E(H)| = O\left(n^{1 + \frac{2}{\alpha}}\right) \]
+    \end{itemize}
+\end{frame}
+
+% ==========================================
+\section{Motivation and Theoretical Bounds}
+% ==========================================
+
+\begin{frame}{Distributed Models of Computation}
+    In the distributed model, processors reside in vertices of the graph. 
+    The processors communicate with their graph neighbors in synchronous rounds.
+    The running time of an algorithm in this model is the number of rounds that it runs.
+    \vspace{0.4cm}
+    \begin{block}{The LOCAL Model}
+        In the LOCAL model, messages' size is arbitrary.
+    \end{block}
+    \begin{block}{The CONGEST Model}
+        In each round, messages of bounded length can be sent.
+    \end{block}
+\end{frame}
+
+\begin{frame}{Previous Results in the CONGEST Model}
+    State-of-the-art randomized algorithms in the distributed-CONGEST model:
+    \vspace{0.3cm}
+    
+    \begin{itemize}
+        \item \textbf{\cite{MPVX15}:} Computes an $O(k)$-spanner with $O(n^{1+1/k})$ expected edges in \textbf{$O(k)$ rounds}.
+        \vspace{0.2cm}
+        \item \textbf{\cite{BS07, Elk07a}:} Computes a $(2k - 1)$-spanner with $O(k \cdot n^{1+1/k})$ expected edges in \textbf{$k$ rounds}.
+    \end{itemize}
+    
+    \vspace{0.4cm}
+    \begin{alertblock}{Theoretical Lower Bound}
+        Under Erdős' girth conjecture, it is proven that \textbf{at least $k$ rounds} are strictly required for this task \cite{Elk07a, DGPV08}.
+    \end{alertblock}
+\end{frame}
+
+\begin{frame}{Our Contributions}
+    This paper improves the previous state-of-the-art across the entire range of parameters, offering three main results:
+    \vspace{0.4cm}
+    
+    \begin{itemize}
+        \item \textbf{Unweighted Graphs (CONGEST):} Computes a $(2k - 1)$-spanner with $O(n^{1+1/k}/\epsilon)$ edges in exactly $k$ rounds. (For $k \ge \log n$, edges tighten to $n(1 + O(\frac{\log n}{\epsilon \cdot k}))$).
+        
+        \vspace{0.3cm}
+        \item \textbf{Ultra-Sparse Skeletons:} The first efficient distributed algorithm yielding an $\tilde{O}(\log n)$-spanner with $n(1 + o(1))$ edges with probability $1 - o(1)$.
+        
+        \vspace{0.3cm}
+        \item \textbf{Weighted Graphs:} Extends the approach to compute a $(2k - 1)(1 + \epsilon)$-spanner with $O(n^{1+1/k} \cdot \frac{\log k}{\epsilon})$ edges in expected $O(|E|)$ centralized time.
+    \end{itemize}
+\end{frame}
+
+% ==========================================
+\section{Core Algorithm: Unweighted Graphs}
+% ==========================================
+
+\begin{frame}{Probabilistic Setup \& Core Parameters}
+    Let $G = (V,E)$ be a graph on $n$ vertices, and let $k \ge 1$ be an integer.
+    
+    \vspace{0.3cm}
+    \begin{block}{Key Parameters}
+        \begin{itemize}
+            \item $c > 3$: A parameter governing the success probability.
+            \item $\beta = \ln(cn)/k$: The scaling factor.
+        \end{itemize}
+    \end{block}
+    
+    \vspace{0.3cm}
+    \begin{block}{The Exponential Distribution}
+        Each vertex will sample a random value from $\mathcal{EXP}(\beta)$, which has the density function:
+        \[ 
+        f(x) = \begin{cases} 
+        \beta \cdot e^{-\beta x} & x \ge 0 \\ 
+        0 & \text{otherwise.} 
+        \end{cases} 
+        \]
+    \end{block}
+\end{frame}
+
+\begin{frame}{Algorithm: Randomized $(2k-1)$-Spanner}
+    \vspace{-0.1cm}
+    \begin{block}{}
+        \small
+        \vspace{0.1cm}
+        $\beta \gets \frac{\ln(cn)}{k}$ \\
+        \textbf{for} $u \in V$ \textbf{do} \\
+        \hspace*{1em} Draw $r_u \sim \mathcal{EXP}(\beta)$ \\
+        \hspace*{1em} $u$ broadcasts $r_u$ to all vertices $v$ within distance $k$ \\
+        \hspace*{1em} \textbf{if} $x$ receives a message from $u$ \textbf{then} \\
+        \hspace*{2em} $x$ stores $m_u(x) = r_u - d_G(u, x)$ \\
+        \hspace*{2em} $x$ stores $p_u(x)$, a neighbor on a shortest path from $u$ to $x$ \\
+        \hspace*{3em} \textcolor{gray}{\scriptsize \textit{(break ties arbitrarily if there is more than one)}} \\
+        \hspace*{1em} \textbf{end if} \\
+        \textbf{end for} \\
+        $m(x) \gets \max_{u \in V} m_u(x)$ \\
+        \textbf{for} $x \in V$ \textbf{do} \\
+        \hspace*{1em} $E' \gets E' \cup C(x) = \{ (x, p_u(x)) : m_u(x) \ge m(x) - 1 \}$ \\
+        \textbf{end for} \\
+        \textbf{return} $E'$
+        \vspace{0.1cm}
+    \end{block}
+\end{frame}
+
+\begin{frame}{Lemma 1: Bounding Candidate Edges}
+    The following lemma is implicit in [MPVX15]. We provide a proof for completeness.
+    
+    \vspace{0.2cm}
+    \begin{lemma}[1]
+        Let $d_1 \le \dots \le d_n$ be arbitrary values and let $\delta_1, \dots, \delta_n$ be independent random variables sampled from $\mathcal{EXP}(\beta)$. Define the random variables $M = \max_i\{\delta_i - d_i\}$ and $I = \{i : \delta_i - d_i \ge M - 1\}$. Then for any $1 \le t \le n$,
+        \[ \Pr[|I| \ge t] = (1 - e^{-\beta})^{t-1} .\]
+    \end{lemma}
+\end{frame}
+
+\begin{frame}{Proof of Lemma 1}
+    \textit{Proof.}
+    \vspace{0.2cm}
+    \begin{itemize}
+        \item Denote by $X^{(t)}$ the random variable which is the $t$-th largest among $\{\delta_i - d_i\}$.
+        \item Then for any value $a \in \mathbb{R}$, if we condition on $X^{(t)} = a$, then the event $|I| \ge t$ is exactly the event that all the remaining $t - 1$ values $X^{(1)}, \dots, X^{(t-1)}$ are at least $a$ and at most $a + 1$.
+        \item Using the memoryless property of the exponential distribution and the independence of the $\{\delta_i\}$, we have that
+        \[ \Pr[|I| \ge t \mid X^{(t)} = a] = (1 - e^{-\beta})^{t-1} .\]
+        \item Since this bound does not depend on the value of $a$, applying the law of total probability we conclude that
+        \[ \Pr[|I| \ge t] = (1 - e^{-\beta})^{t-1} .\] \hfill $\square$
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Lemma 2: Expected Size of the Spanner}
+    Using Lemma 1, we can bound the expected size of the spanner $H$.
+    
+    \vspace{0.3cm}
+    \begin{lemma}[2]
+        The expected size of $H$ is at most $(cn)^{1/k} \cdot n$.
+    \end{lemma}
+    
+    \vspace{0.3cm}
+    \small
+    \textit{Proof:} Fix any $x \in V$. The event $|C(x)| \ge t$ happens when at least $t$ shifted variables $r_u - d_G(u,x)$ are within $1$ of the maximum. By Lemma 1, this probability is at most $(1 - e^{-\beta})^{t-1}$. We conclude that:
+    \[ \mathbb{E}[|C(x)|] = \sum_{t=1}^n \Pr[|C(x)| \ge t] \le \sum_{t=0}^\infty (1 - e^{-\beta})^t = e^\beta = (cn)^{1/k} \]
+    The lemma follows by the linearity of expectation over all $n$ vertices. \hfill $\square$
+\end{frame}
+
+\begin{frame}{Claims 3 \& 4: Bounding the Distances}
+    Now we argue about the stretch. First, we establish high-probability bounds on the sampled values and distances.
+    
+    \vspace{0.2cm}
+    \begin{block}{Claim 3}
+        With probability at least $1 - 1/c$, it holds that $r_u < k$ for all $u \in V$.
+    \end{block}
+    \small
+    \textit{Proof.} For any $u \in V$, $\Pr[r_u \ge k] = e^{-\beta k} = 1/(cn)$. By the union bound over $n$ vertices, $\Pr[\exists u, r_u \ge k] \le 1/c$. \hfill $\square$
+    
+    \vspace{0.3cm}
+    \normalsize
+    Assume for now that the event of Claim 3 holds.
+    
+    \vspace{0.2cm}
+    \begin{block}{Corollary 4}
+        For any $x \in V$, if $u \in V$ is the vertex maximizing $m_u(x)$, then $d_G(u,x) < k$.
+    \end{block}
+    \small
+    \textit{Proof.} First note that $m(x) \ge m_x(x) \ge 0$, and using Claim 3 we have $r_u < k$. So $0 \le m(x) = m_u(x) = r_u - d_G(u,x) < k - d_G(u,x)$. \hfill $\square$
+\end{frame}
+
+\begin{frame}{Claim 5: Shortest Path Containment}
+    \textbf{Claim 5:} For any $u, x \in V$, if $x$ adds an edge to $p_u(x)$, then there is a shortest path $P$ between $u$ and $x$ that is fully contained in $H$.
+    
+    \vspace{0.2cm}
+    \small
+    \textit{Proof (by induction on $d_G(u,x)$):}
+    \begin{itemize}
+        \item \textbf{Base case:} If $d_G(x,u) = 1$, then $p_u(x) = u$, so $(x,u)$ is in $H$.
+        \item \textbf{Step:} Assume true for $t-1$. Let $d_G(u,x) = t$. We know $x$ added an edge to $y = p_u(x)$ satisfying $d_G(u,y) = t - 1$.
+        \item We claim $m(y) \le m(x) + 1$. Suppose not; let $v$ maximize $m_v(y)$. By Cor 4, $d_G(v,y) < k$, so $d_G(v,x) \le k$. Thus $x$ will hear from $v$, yielding $m_v(x) \ge m_v(y) - 1 = m(y) - 1 > m(x)$, a contradiction.
+        \item By construction, $m_u(x) \ge m(x) - 1$.
+        \item We conclude: $m_u(y) = m_u(x) + 1 \ge m(x) \ge m(y) - 1$.
+        \item So $y$ adds an edge to $p_u(y)$, and by the induction hypothesis we are done. \hfill $\square$
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Lemma 6: The Stretch Bound}
+    \textbf{Lemma 6:} The spanner $H$ has stretch at most $2k - 1$.
+    
+    \vspace{0.1cm}
+    \begin{columns}[c]
+        \begin{column}{0.4\textwidth}
+            \begin{center}
+                \begin{tikzpicture}[scale=1.15]
+                    \node[circle, draw=MetroDark, fill=MetroDark, inner sep=0pt, minimum size=5pt, label=above:{\small $u$ (Center)}] (u) at (1.5, 2) {};
+                    \node[circle, draw=MetroDark, fill=MetroDark, inner sep=0pt, minimum size=5pt, label=below left:{\small $x$}] (x) at (0, 0) {};
+                    \node[circle, draw=MetroDark, fill=MetroDark, inner sep=0pt, minimum size=5pt, label=below right:{\small $y$}] (y) at (3, 0) {};
+                    
+                    \draw[thick, MetroDark] (x) -- (y) node[midway, below] {\scriptsize $(x,y) \in E$};
+                    
+                    \draw[very thick, dashed, MetroOrange, ->] (x) to[bend left=15] node[midway, left=0.1cm] {\scriptsize $\le k-1$} (u);
+                    \draw[very thick, dashed, MetroOrange, <-] (u) to[bend left=15] node[midway, right=0.1cm] {\scriptsize $\le k$} (y);
+                \end{tikzpicture}
+            \end{center}
+        \end{column}
+        
+        \begin{column}{0.6\textwidth}
+            \small
+            \textit{Proof.}
+            \begin{itemize}
+                \item Consider any $(x,y) \in E$. Let $u$ be the vertex maximizing $m(x)$, and w.l.o.g assume $m(x) \ge m(y)$.
+                \item By Cor 4, $d_G(u,x) \le k-1$, so $d_G(u,y) \le k$, and $y$ heard the message of $u$.
+                \item This implies $m_u(y) \ge m_u(x) - 1 = m(x) - 1 \ge m(y) - 1$.
+                \item So $y$ adds the edge $(y, p_u(y))$ to $H$.
+                \item By Claim 5, both have shortest paths to $u$ fully contained in $H$.
+                \item These two paths provide stretch $(k-1) + k = 2k-1$. \hfill $\square$
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Main Theorem}
+    We now state our main theorem, from which we will derive several interesting corollaries in various settings.
+    
+    \vspace{0.4cm}
+    \begin{theorem}[Theorem 1]
+        For any unweighted graph $G = (V,E)$ on $n$ vertices, any integer $k \ge 1$, $c > 3$ and $\delta > 0$, there is a randomized algorithm that with probability at least $(1 - 1/c) \cdot \delta / (1+\delta)$ computes a spanner with stretch $2k - 1$ and number of edges at most
+        \[ (1+\delta) \cdot \frac{(cn)^{1+1/k}}{c-1} - \delta(n-1) .\]
+    \end{theorem}
+\end{frame}
+
+\begin{frame}{Proof of Main Theorem (Part 1)}
+    \small
+    \textit{Proof.}
+    \begin{itemize}
+        \item Let $\mathcal{Z}$ be the event that $\{\forall u \in V, r_u < k\}$. By Claim 3 we have $\Pr[\mathcal{Z}] \ge 1 - 1/c$.
+        \item Note that conditioning on $\mathcal{Z}$, by Lemma 6 the algorithm produces a spanner $H = (V,E')$ with stretch $2k - 1$. In particular, it must have at least $n - 1$ edges.
+        \item Let $X$ be the random variable $|E'| - (n - 1)$, which conditioned on $\mathcal{Z}$ takes only nonnegative values.
+        \item By Lemma 2 we have $\mathbb{E}[X] = (cn)^{1/k} \cdot n - (n - 1)$.
+        \item We now argue that conditioning on $\mathcal{Z}$ will not affect this expectation by much. Indeed, by the law of total probability, for any $t$, $\Pr[X = t] \ge \Pr[X = t \mid \mathcal{Z}] \cdot \Pr[\mathcal{Z}]$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Proof of Main Theorem (Part 2)}
+    \small
+    \textit{Proof (Continued).}
+    \begin{itemize}
+        \item Thus
+        \[ \mathbb{E}[X \mid \mathcal{Z}] \le \frac{\mathbb{E}[X]}{\Pr[\mathcal{Z}]} \le \frac{c}{c-1} \cdot \left[ (cn)^{1/k} \cdot n - (n - 1) \right] . \quad (3) \]
+        
+        \item Recall \textbf{Markov's inequality}: for a non-negative random variable $Y$ and $a > 0$,
+        \[ \Pr[Y \ge a] \le \frac{\mathbb{E}[Y]}{a} \]
+        
+        \item Applying this to $X$ conditional on $\mathcal{Z}$, with $a = (1+\delta)\mathbb{E}[X \mid \mathcal{Z}]$:
+        \begin{align*}
+            \Pr[X \ge (1+\delta)\mathbb{E}[X \mid \mathcal{Z}] \mid \mathcal{Z}] &\le \frac{\mathbb{E}[X \mid \mathcal{Z}]}{(1+\delta)\mathbb{E}[X \mid \mathcal{Z}]} \\
+            &= \frac{1}{1+\delta} .
+        \end{align*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Proof of Main Theorem (Part 3)}
+    \small
+    \begin{itemize}
+        \item We conclude that
+        \begin{align*}
+            \Pr[(X < (1+\delta)\mathbb{E}[X \mid \mathcal{Z}]) \wedge \mathcal{Z}] &= \Pr[X < (1+\delta)\mathbb{E}[X \mid \mathcal{Z}] \mid \mathcal{Z}] \cdot \Pr[\mathcal{Z}] \\
+            &\ge \left(1 - \frac{1}{1+\delta}\right) \cdot \left(1 - \frac{1}{c}\right) \\
+            &= \frac{\delta}{1+\delta} \cdot \left(1 - \frac{1}{c}\right) .
+        \end{align*}
+        
+        \item If this indeed happens, then
+        \begin{align*}
+            |E'| &= X + n - 1 \\
+            &\le^{(3)} (1 + \delta) \cdot \frac{c}{c-1} \cdot \left[ (cn)^{1/k} \cdot n - (n - 1) \right] + n - 1 \\
+            &= (1+\delta) \cdot \frac{(cn)^{1+1/k} - (n-1)}{c-1} - \delta(n-1) . \tag*{$\square$}
+        \end{align*}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Implementation Details: Distributed Models}
+    \vspace{-0.1cm}
+    \begin{block}{The LOCAL Model}
+        \small
+        \begin{itemize}
+            \item It is straightforward to implement and takes exactly $k$ rounds to execute.
+            \item In each round, every vertex sends to its neighbors \textbf{all} the messages it received so far.
+        \end{itemize}
+    \end{block}
+    
+    \vspace{0.1cm}
+    \begin{block}{The CONGEST Model (Bandwidth Limited)}
+        \small
+        \begin{itemize}
+            \item Requires a small variation: in each round, every vertex $v \in V$ will send to all its neighbors \textbf{only} the message $(r_u, d_G(u,v))$ for the center $u$ that currently maximizes $m_u(v) = r_u - d_G(u,v)$.
+            \item \textbf{Why does this suffice?} Omitting all other messages will not affect the algorithm. If one such omitted message would cause some neighbor of $v$ to add an edge to $v$, then the message about $u$ will suffice anyway, as the latter has the strictly largest $m_u(v)$ value.
+            \item \textcolor{gray}{\scriptsize \textit{(Recall that all vertices start their broadcast simultaneously for $k$ rounds, so dropping omitted messages has no ripple effect on farther vertices.)}}
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+% ==========================================
+\section{Extension to Weighted Graphs}
+% ==========================================
+
+\begin{frame}{The Goal for Weighted Graphs}
+    Miller et al. \cite{MPVX15} provided a scheme to convert unweighted $O(k)$-spanners into weighted ones. We adapt this to our tight $(2k-1)$-spanner.
+    
+    \vspace{0.3cm}
+    \begin{block}{The Objective}
+        Convert our unweighted $(2k - 1)$-spanner algorithm (Theorem 1) into an efficient algorithm for constructing $(2k - 1)(1 + \epsilon)$-spanners with $O(n^{1+1/k} \cdot \frac{\log k}{\epsilon})$ edges for weighted graphs.
+    \end{block}
+    
+    \vspace{0.3cm}
+    \textbf{The Scheme of \cite{MPVX15}: Edge Partitioning}
+    \begin{itemize}
+        \item Partition edges into $\lambda = \lceil \log_{1+\epsilon} \omega_{max} \rceil$ categories: $E_t = \{e \in E \mid \omega(e) \in [(1+\epsilon)^{t-1}, (1+\epsilon)^t)\}$.
+        \item Define $\ell = \lceil \log_{1+\epsilon} k^c \rceil$ for a sufficiently large constant $c$.
+        \item Create $\ell$ distinct graphs $G_j = (V, \hat{E}_j)$, where $\hat{E}_j = \bigcup \{E_t \mid t \equiv j \pmod \ell\}$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The Scheme of \cite{MPVX15}: Well-Separated Graphs}
+    \textbf{Properties of each Graph $G_j$:}
+    \begin{itemize}
+        \item The edge weights in $G_j$ are \textit{well-separated}. 
+        \item $\hat{E}_j$ is a disjoint union of at most $q = \lceil \lambda / \ell \rceil$ edge sets $E^{(1)}, \dots, E^{(q)}$.
+        \item \textbf{Uniformity:} Edge weights within each set $E^{(i)}$ are within a factor of $1 + \epsilon$.
+        \item \textbf{Separation:} Weights across sets satisfy $w^{(i)} = w^{(1)} (k^c)^{i-1}$.
+    \end{itemize}
+    
+    \vspace{0.2cm}
+    \begin{block}{The Blackbox Routine}
+        \begin{itemize}
+            \item For each $G_j$, the scheme constructs a spanner and takes the union of $\ell = O(\frac{\log k}{\epsilon})$ such spanners as the ultimate spanner.
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{The Contraction Mechanism}
+    How does the scheme construct the spanner for a single $G_j$?
+    
+    \vspace{0.2cm}
+    \begin{itemize}
+        \item \textbf{Step 1:} Run the unweighted spanner routine on $E^{(1)}$ to construct $H^{(1)}$ and a partition $\mathcal{P}^{(1)}$.
+        \item \textbf{Step 2:} Contract each cluster of $\mathcal{P}^{(1)}$ (which have unweighted radii at most $k - 1$) into single vertices of $V^{(2)}$.
+        \item \textbf{Step 3:} Run the unweighted routine on $(V^{(2)}, E^{(2)})$ to get $H^{(2)}$ and $\mathcal{P}^{(2)}$, contract again, and repeat.
+        \item \textbf{Final Spanner:} The output for $G_j$ is $H = \bigcup_{i=1}^q H^{(i)}$.
+    \end{itemize}
+    
+    \vspace{0.2cm}
+    \begin{block}{Stretch Guarantee}
+        The scheme guarantees a stretch of $(1 + \epsilon)(1 + O(k^{-(c-1)}))O(k)$. This holds because weights within categories are uniform up to $1+\epsilon$, and contracted clusters have weights roughly $k^{-c}$ smaller than the current scale.
+    \end{block}
+\end{frame}
+
+\begin{frame}{The Shortcoming in the Size Analysis}
+    While the stretch analysis of \cite{MPVX15} is sufficient, their size analysis is problematic for our tight bounds.
+    
+    \vspace{0.2cm}
+    \begin{alertblock}{The "Plugging-in" Problem}
+        \begin{itemize}
+            \item In \cite{MPVX15}, every active vertex contributes expected $O(n^{1/k})$ edges per phase, leading to an overall size of $O(n^{1+2/k})$. They fix this by rescaling $k' = 2k$.
+            \item If we plug in our tight $(2k-1)$ stretch routine, we obtain a $(2k-1)(1+\epsilon)^2(1+k^{-(c-1)})$-spanner, but with $O(n^{1+2/k})$ edges.
+            \item Rescaling $k' = 2k$ would yield a $(4k-2)(1+O(\epsilon))$-spanner. We would completely lose our tight $(2k-1)$ stretch!
+        \end{itemize}
+    \end{alertblock}
+    
+    \textbf{Solution:} We refine their size analysis to show every vertex $u$ contributes expected $O(n^{1/k})$ edges in \textbf{all phases altogether}.
+\end{frame}
+
+\begin{frame}{Refined Size Analysis: Definitions}
+    Let's track a vertex $u$ across phases $i = 1, 2, \dots, q$:
+    \vspace{0.2cm}
+    
+    \begin{itemize}
+        \item $r_u^{(i)}$: The radius $u$ tosses from $\mathcal{EXP}(\beta)$ in the $i$-th phase.
+        \item \textbf{Candidate Vertex:} A vertex $v$ is a candidate on phase $i$ if its broadcast reaches $u$ no later than time $-r_u^{(i)} + 1$, meaning:
+        \[ -r_u^{(i)} + 1 \ge -r_v^{(i)} + d(v,u) \]
+        \item $X^{(i)}$: The number of such candidate vertices on phase $i$.
+        \item $j$: The phase in which $u$ was contracted.
+        \item $\hat{X}^{(i)}$: The total number of candidates $u$ sees between phase $i$ and phase $j$.
+    \end{itemize}
+    
+    \vspace{0.2cm}
+    We focus on $\hat{X} = \hat{X}^{(1)}$, the total contribution across all phases. Our goal is to prove: $\Pr(\hat{X} > t) \le (1 - e^{-\beta})^t$.
+\end{frame}
+
+\begin{frame}{Refining the Size Analysis (Probability Bound 1)}
+    By the law of total probability on the first phase:
+    \[ \Pr(\hat{X} > t) = \sum_{t^{(1)}=0}^\infty \Pr(X^{(1)} = t^{(1)}) \cdot \Pr(\hat{X} > t \mid X^{(1)} = t^{(1)}) \]
+    
+    \vspace{0.2cm}
+    \textbf{Case 1: $t^{(1)} > t$}
+    \begin{itemize}
+        \item We have: $\Pr(\hat{X} > t \mid X^{(1)} = t^{(1)}) = (1 - e^{-\beta})^t$.
+        \item \textit{Justification:} The left-hand side is exactly the probability that on the first phase, all the $t$ first candidate vertices $v$ have $-r_v^{(1)} + d(v,u) \ge -r_u^{(1)}$, conditioned on them being candidates.
+        \item Since these are independent shifted exponential random variables, the equation follows strictly from the memoryless property of the exponential distribution.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Refining the Size Analysis (Probability Bound 2)}
+    \textbf{Case 2: $t^{(1)} \le t$}
+    \small
+    \begin{align*}
+        \Pr(\hat{X} > t \mid X^{(1)} = t^{(1)}) &= (1 - e^{-\beta})^{t^{(1)}} \cdot \Pr(\hat{X}^{(2)} > t - t^{(1)} \mid X^{(1)} = t^{(1)}, \hat{X}^{(1)} \ge t^{(1)}) \\
+        &= (1 - e^{-\beta})^{t^{(1)}} \cdot \Pr(\hat{X}^{(2)} > t - t^{(1)} \mid \hat{X}^{(1)} \ge X^{(1)})
+    \end{align*}
+    
+    \begin{itemize}
+        \item By conducting backward induction on the phase (base case is last phase $q$), we obtain:
+        \[ \Pr(\hat{X}^{(2)} > t - t^{(1)} \mid \hat{X}^{(1)} \ge X^{(1)}) \le (1 - e^{-\beta})^{t - t^{(1)}} \]
+        \item Thus, for any $t^{(1)} \le t$, it holds that $\Pr(\hat{X}^{(1)} > t \mid X^{(1)} = t^{(1)}) \le (1 - e^{-\beta})^t$.
+    \end{itemize}
+    
+    \vspace{0.1cm}
+    Summing over all $t^{(1)}$, we conclude $\Pr(\hat{X} > t) \le (1 - e^{-\beta})^t$.
+\end{frame}
+
+\begin{frame}{Expected Size and Final Theorem for Weighted Graphs}
+    Using the proven probability bound, the expected contribution of every vertex is tightly bounded across all phases:
+    \[ \mathbb{E}(\hat{X}) = \sum_{t=0}^\infty \Pr(\hat{X} > t) \le \sum_{t=0}^\infty (1 - e^{-\beta})^t = e^\beta = O(n^{1/k}) \]
+    This gives an overall spanner size of $O(n^{1+1/k})$ for each $G_j$.
+    
+    \vspace{0.4cm}
+    \begin{theorem}[Theorem 2]
+        Given a weighted $n$-vertex graph $G$, and a pair of parameters $k \ge 1, 0 < \epsilon < 1$, our algorithm computes a $(2k - 1)(1 + \epsilon)$-spanner of $G$ with $O(n^{1+1/k} \cdot (\log k)/\epsilon)$ edges, in expected $O(|E|)$ centralized time.
+    \end{theorem}
+\end{frame}
+
+% ==========================================
+\section{Implications and Skeletons}
+% ==========================================
+
+\begin{frame}{Implications of Theorem 1: Centralized Model}
+    \begin{block}{Corollary 7 (Standard Centralized Model)}
+        For any unweighted graph $G$ on $n$ vertices and $m$ edges, and any integer $k \ge 2$, there is a randomized algorithm that with high probability computes a spanner with stretch $2k - 1$ and $n^{1+1/k} \cdot \left(1 + \frac{O(\ln k)}{k}\right)$ edges. The running time is $\tilde{O}(k|E|)$.
+    \end{block}
+    
+    \vspace{0.2cm}
+    \small
+    \textit{Proof Idea:}
+    \begin{itemize}
+        \item Apply Theorem 1 with parameters $c = k$ and $\delta = 1/k$.
+        \item The probability of success in a single run is at least $\frac{k-1}{k} \cdot \frac{1}{k+1} \ge \frac{1}{3k}$.
+        \item The number of edges is bounded by:
+        \[ (1 + 1/k) \cdot \frac{(kn)^{1+1/k}}{k - 1} \le n^{1+1/k} \cdot \left(1 + \frac{O(\ln k)}{k}\right) . \]
+        \item Repeating the algorithm $O(k \ln n)$ times guarantees the high probability of success. \hfill $\square$
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Implications of Theorem 1: Distributed Model}
+    \begin{block}{Corollary 8 (Distributed Model)}
+        For any unweighted graph $G$ on $n$ vertices, any $k \ge 1$ and $0 < \epsilon < 1$, there is a randomized distributed algorithm that with probability at least $1 - \epsilon$ computes a spanner with stretch $2k - 1$ and $O(n/\epsilon)^{1+1/k}$ edges, within $k$ rounds.
+    \end{block}
+    
+    \vspace{0.3cm}
+    \small
+    \textit{Proof Details:}
+    \begin{itemize}
+        \item Apply Theorem 1 with parameters $c = 3/\epsilon$ and $\delta = 2/\epsilon$.
+        \item The success probability evaluates to at least:
+        \[ (1 - \epsilon/3) \cdot (1 - \epsilon/(\epsilon + 2)) > 1 - \epsilon . \]
+        \item By Theorem 1, plugging in these parameters bounds the number of edges strictly by $O(n/\epsilon)^{1+1/k}$. \hfill $\square$
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Ultra-Sparse Spanners}
+    We now consider the regime where $k \ge \ln n$, pushing sparsity to the absolute limit.
+    
+    \vspace{0.2cm}
+    \begin{block}{Corollary 9 (Ultra-Sparse Spanners)}
+        For any unweighted graph $G$ on $n$ vertices, integer $k \ge \ln n$, and parameter $2/k < \epsilon < 1$, there is a randomized algorithm that with probability $\ge 1 - \epsilon$ computes a $(2k - 1)$-spanner with $n \cdot \left(1 + \frac{O(\ln n)}{\epsilon \cdot k}\right)$ edges.
+    \end{block}
+    
+    \vspace{0.2cm}
+    \small
+    \textit{Proof Sketch:}
+    \begin{itemize}
+        \item Apply Theorem 1 with parameters $c = k$ and $\delta = 2/\epsilon$.
+        \item Success probability is at least $\frac{k-1}{k} \cdot \frac{2/\epsilon}{2/\epsilon + 1} \ge 1 - \epsilon$.
+        \item In the regime $k \ge \ln n$, we have $(kn)^{1/k} \le e^{(2\ln n)/k} \le 1 + O(\ln n)/k$.
+        \item Substituting this into Theorem 1 yields the final edge bound. \hfill $\square$
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Ultra-Sparse Skeletons}
+    \begin{block}{Remark 2: The Skeleton Application}
+        The spanner of Corollary 9 can be used as a \textbf{skeleton} for the graph.
+    \end{block}
+    
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \textbf{Parameters:} By setting $\epsilon = o(1)$ and $k = \tilde{O}(\log n)$.
+        \item \textbf{Result:} We obtain, with probability $1 - o(1)$, a skeleton with exactly $n(1 + o(1))$ edges.
+        \item \textbf{Efficiency:} This ultra-sparse backbone is computed in just $\tilde{O}(\log n)$ rounds in the distributed model.
+        \item \textbf{Intuition:} It drops the strict stretch requirement in favor of acting as an incredibly sparse connectivity backbone (almost a tree).
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \begin{center}
+        \Huge \textbf{Thank You!}
+    \end{center}
+\end{frame}
+
+% ==========================================
+% Bibliography / References
+% ==========================================
+
+\begin{frame}[allowframebreaks]{References}
+    \small
+    \begin{thebibliography}{99}
+        
+        \bibitem[ABS+20]{SurveyPaper}
+        R. Ahmed, G. Bodwin, F. D. Sahneh, K. Hamm, M. J. L. Jebelli, S. Kobourov, and R. Spence.
+        \newblock Graph spanners: A tutorial review.
+        \newblock \emph{Computer Science Review}, 37:100253, 2020.
+        
+        \bibitem[MPVX15]{MPVX15}
+        G. L. Miller, R. Peng, A. Vladu, and S. C. Xu.
+        \newblock Improved parallel algorithms for spanners and hopsets.
+        \newblock \emph{SPAA '15}, pages 192--201, 2015.
+
+        \bibitem[HZ96]{HZ96}
+        S. Halperin and U. Zwick.
+        \newblock Combinatorial algorithms for the Boolean matrix multiplication.
+        \newblock \emph{SODA '96}, pages 598--607, 1996.
+
+        \bibitem[ES16]{ES16}
+        M. Elkin and S. Solomon.
+        \newblock Fast constructions of lightweight spanners for general graphs.
+        \newblock \emph{SODA '16}, pages 883--901, 2016.
+
+        \bibitem[BS07]{BS07}
+        S. Baswana and S. Sen.
+        \newblock A simple and linear time randomized algorithm for computing sparse spanners in weighted graphs.
+        \newblock \emph{Random Struct. Algorithms}, 30(4):532--563, 2007.
+
+        \bibitem[Elk07a]{Elk07a}
+        M. Elkin.
+        \newblock A near-optimal distributed fully dynamic algorithm for maintaining sparse spanners.
+        \newblock \emph{PODC '07}, pages 185--194, 2007.
+
+        \bibitem[DGPV08]{DGPV08}
+        B. Derbel, C. Gavoille, D. Peleg, and L. Viennot.
+        \newblock On the locality of distributed sparse spanner construction.
+        \newblock \emph{PODC '08}, pages 273--282, 2008.
+
+    \end{thebibliography}
+\end{frame}
+
+\end{document}
